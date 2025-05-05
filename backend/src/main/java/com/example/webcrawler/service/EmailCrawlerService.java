@@ -31,23 +31,37 @@ public class EmailCrawlerService {
     // private String crawlDir;
 
     // Simulate crawling and extracting emails from a given HTML/text
-    public Set<EmailResult> extractEmails(String url, String content) {
+
+    public Set<EmailResult> extractEmails(String url, String content, Set<String> globalEmailSet) {
         Set<EmailResult> results = new HashSet<>();
         Pattern emailPattern = Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
         Matcher matcher = emailPattern.matcher(content);
         while (matcher.find()) {
             String email = matcher.group();
-            EmailResult result = new EmailResult(url, email);
-            results.add(result);
-            emailResultRepository.save(result);
+            if (!globalEmailSet.contains(email)) {
+                EmailResult result = new EmailResult(url, email);
+                results.add(result);
+                emailResultRepository.save(result);
+                globalEmailSet.add(email);
+            }
         }
         return results;
     }
 
     // Fetch the real page and extract emails
     public void startCrawl(String seedUrl) {
+        Set<String> visitedUrls = new HashSet<>();
+        Set<String> foundEmails = new HashSet<>();
+        crawlRecursive(seedUrl, visitedUrls, foundEmails, 0, 2); // maxDepth=2 for demo
+    }
+
+    private void crawlRecursive(String url, Set<String> visitedUrls, Set<String> foundEmails, int depth, int maxDepth) {
+        if (depth > maxDepth || visitedUrls.contains(url)) {
+            return;
+        }
+        visitedUrls.add(url);
         // Remove any surrounding quotes from the URL
-        String cleanedUrl = seedUrl;
+        String cleanedUrl = url;
         if (cleanedUrl != null) {
             cleanedUrl = cleanedUrl.trim();
             if ((cleanedUrl.startsWith("\"") && cleanedUrl.endsWith("\"")) ||
@@ -58,7 +72,14 @@ public class EmailCrawlerService {
         try {
             Document doc = Jsoup.connect(cleanedUrl).get();
             String html = doc.html();
-            extractEmails(cleanedUrl, html);
+            extractEmails(cleanedUrl, html, foundEmails);
+            // Find and crawl links
+            doc.select("a[href]").forEach(link -> {
+                String absHref = link.absUrl("href");
+                if (absHref.startsWith("http")) {
+                    crawlRecursive(absHref, visitedUrls, foundEmails, depth + 1, maxDepth);
+                }
+            });
         } catch (IOException e) {
             e.printStackTrace();
         }
