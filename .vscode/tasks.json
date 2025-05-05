@@ -1,0 +1,13 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"type": "shell",
+			"label": "Create Vue frontend app",
+			"command": "npm create vue@latest frontend -- --default && cd frontend && npm install axios",
+			"args": [],
+			"isBackground": false,
+			"group": "build"
+		}
+	]
+}
